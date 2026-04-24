@@ -1,34 +1,6 @@
 {
   "reports": [
     {
-      "id": "b4036e7e-0859-4a28-8a4b-4fecbd8d0fc4",
-      "type": "Unsafe crossing",
-      "context": "Studio map center 1.28839, 103.82123",
-      "mode": "studio",
-      "lat": 1.2883901595910459,
-      "lng": 103.82122784864464,
-      "createdAt": "2026-04-24T08:04:15.417Z",
-      "createdBy": "admin",
-      "updatedAt": null,
-      "updatedBy": "",
-      "deviation": null,
-      "editorDraft": null
-    },
-    {
-      "id": "412f1c5d-0a80-478f-9ead-cf4d78f546bb",
-      "type": "Missing road",
-      "context": "Studio map center 1.29126, 103.79315",
-      "mode": "studio",
-      "lat": 1.291259000303441,
-      "lng": 103.79315195915615,
-      "createdAt": "2026-04-24T08:15:06.996Z",
-      "createdBy": "admin",
-      "updatedAt": null,
-      "updatedBy": "",
-      "deviation": null,
-      "editorDraft": null
-    },
-    {
       "id": "e7ca0991-294b-4a7c-8d20-fa56f7fdc0d8",
       "type": "Taking a shortcut",
       "context": "Taking a shortcut placed at 1.29138, 103.79201",

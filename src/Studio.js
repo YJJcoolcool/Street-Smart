@@ -52,7 +52,9 @@ const elements = {
   visibleCount: document.querySelector("#studio-visible-count"),
   list: document.querySelector("#studio-report-list"),
   empty: document.querySelector("#studio-empty"),
-  reportButtons: [...document.querySelectorAll(".studio-report-actions .report-button")],
+  accordions: [...document.querySelectorAll(".studio-accordion")],
+  reportButtons: [...document.querySelectorAll("[data-signal]")],
+  mapEditButtons: [...document.querySelectorAll("[data-map-edit]")],
   editToolbar: document.querySelector("#studio-edit-toolbar"),
   editTitle: document.querySelector("#studio-edit-title"),
   editModeLabel: document.querySelector("#studio-edit-mode-label"),
@@ -77,9 +79,12 @@ const state = {
   failedMapProviders: new Set(),
   selectedReportId: null,
   editingReportId: null,
+  creationMode: null,
+  pendingReportType: null,
   locationEditMode: false,
   reportPlacementMarker: null,
-  drawMode: "node",
+  draftNodeMarkers: [],
+  drawMode: "road",
   draftNodes: [],
   ignoreNextMapClick: false,
   map: null
@@ -118,34 +123,105 @@ state.map.on("error", (event) => {
 state.map.on("click", (event) => handleStudioMapClick(event));
 
 elements.reportButtons.forEach((button) => {
-  button.addEventListener("click", () => addReport(button.dataset.signal));
+  button.addEventListener("click", () => startNewReportPlacement(button.dataset.signal));
+});
+elements.mapEditButtons.forEach((button) => {
+  button.addEventListener("click", () => startMapEdit(button.dataset.mapEdit));
 });
 bindSettings();
 bindStudioAuth();
 bindReportEditing();
+bindStudioAccordions();
 await refreshStudioSession();
 renderStudioAuth();
 await loadReports();
 
 renderReports();
 
-async function addReport(type) {
+function startMapEdit(kind) {
+  if (kind === "missing-road") {
+    startMissingRoadEditor();
+    return;
+  }
+  if (kind === "missing-place") {
+    startNewReportPlacement("Missing place", { mode: "missing-place" });
+  }
+}
+
+function startNewReportPlacement(type, { mode = "report" } = {}) {
   if (!state.studioSession?.token) {
     elements.status.textContent = "Login to Street Smart Studio before submitting map edits.";
     elements.loginButton.focus();
     return;
   }
 
+  state.creationMode = mode;
+  state.pendingReportType = type;
+  state.editingReportId = null;
+  state.locationEditMode = true;
+  state.selectedReportId = null;
+  state.draftNodes = [];
+  clearSelectedReportLayers();
+
+  elements.editToolbar.hidden = false;
+  elements.editTitle.textContent = type;
+  elements.editModeLabel.textContent = mode === "missing-place" ? "Place" : "Report";
+  elements.editInstructions.textContent = "Drag the marker to the report location, then save.";
+  elements.roadEditor.hidden = true;
+  elements.saveLocation.hidden = false;
+  setSaveLocationButton("location_on", mode === "missing-place" ? "Save place" : "Save report");
+
   const center = state.map.getCenter();
+  ensureReportPlacementMarker();
+  state.reportPlacementMarker.setLngLat(center).addTo(state.map);
+  state.reportPlacementMarker.getElement().hidden = false;
+  elements.status.textContent = `${type}: drag the marker to the right location, then save.`;
+}
+
+function startMissingRoadEditor(report = null) {
+  if (!state.studioSession?.token) {
+    elements.status.textContent = "Login to Street Smart Studio before submitting map edits.";
+    elements.loginButton.focus();
+    return;
+  }
+
+  state.creationMode = report ? null : "missing-road";
+  state.pendingReportType = "Missing road";
+  state.selectedReportId = report?.id || null;
+  state.editingReportId = report?.id || null;
+  state.locationEditMode = false;
+  state.drawMode = "road";
+  state.draftNodes = report?.editorDraft?.nodes?.filter(isLngLat) || [];
+
+  if (state.reportPlacementMarker) state.reportPlacementMarker.getElement().hidden = true;
+  elements.editToolbar.hidden = false;
+  elements.editTitle.textContent = report?.type || "Add a missing road";
+  elements.editModeLabel.textContent = "Road";
+  elements.editInstructions.textContent = "Click the map to add road nodes. Drag nodes to adjust, or click a node to delete it.";
+  elements.roadEditor.hidden = false;
+  elements.saveLocation.hidden = true;
+  renderEditorDraft(report);
+  elements.status.textContent = "Road editor ready. Add at least two nodes for the missing road.";
+}
+
+async function addReport(type, point, extra = {}) {
+  if (!state.studioSession?.token) {
+    elements.status.textContent = "Login to Street Smart Studio before submitting map edits.";
+    elements.loginButton.focus();
+    return null;
+  }
+
+  const location = point || state.map.getCenter();
   const report = {
     id: crypto.randomUUID(),
     type,
-    context: `Studio map center ${center.lat.toFixed(5)}, ${center.lng.toFixed(5)}`,
+    context: `${type} placed at ${location.lat.toFixed(5)}, ${location.lng.toFixed(5)}`,
     mode: "studio",
-    lat: center.lat,
-    lng: center.lng,
+    lat: location.lat,
+    lng: location.lng,
     createdBy: userLabel(state.studioSession.user),
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    ...extra
   };
   state.reports.unshift(report);
   state.reports = state.reports.slice(0, 200);
@@ -155,10 +231,11 @@ async function addReport(type) {
     await publishReport(report);
     await loadReports({ render: false });
     renderReports();
-    elements.status.textContent = `${type} published at the map center.`;
+    elements.status.textContent = `${type} published.`;
   } catch (error) {
     elements.status.textContent = `${type} saved locally. Studio server sync failed: ${error.message}`;
   }
+  return report;
 }
 
 function bindStudioAuth() {
@@ -784,7 +861,8 @@ function renderSelectedReportPath() {
 
 function bindReportEditing() {
   elements.saveLocation.addEventListener("click", () => {
-    if (state.locationEditMode) saveReportLocation();
+    if (state.creationMode === "report" || state.creationMode === "missing-place") saveNewPlacedReport();
+    else if (state.locationEditMode) saveReportLocation();
     else startReportPlacement(selectedReport());
   });
   elements.cancelEdit.addEventListener("click", () => stopReportEditing());
@@ -802,27 +880,48 @@ function bindReportEditing() {
   elements.saveDraft.addEventListener("click", () => saveEditorDraft());
 }
 
+function bindStudioAccordions() {
+  elements.accordions.forEach((accordion) => {
+    accordion.addEventListener("toggle", () => {
+      if (!accordion.open) return;
+      elements.accordions.forEach((other) => {
+        if (other !== accordion) other.open = false;
+      });
+    });
+  });
+}
+
 function showSelectedReport(report) {
   state.editingReportId = null;
+  state.creationMode = null;
+  state.pendingReportType = null;
   state.locationEditMode = false;
   elements.editToolbar.hidden = false;
   elements.editTitle.textContent = report.type;
   elements.editModeLabel.textContent = "Location";
   elements.editInstructions.textContent = "";
   elements.roadEditor.hidden = true;
+  elements.saveLocation.hidden = false;
   setLocationEditButton(false);
   if (state.reportPlacementMarker) state.reportPlacementMarker.getElement().hidden = true;
+  clearDraftNodeMarkers();
   renderEditorDraft(report);
 }
 
 function startReportPlacement(report) {
   if (!report) return;
+  if (isMissingRoadReport(report)) {
+    startMissingRoadEditor(report);
+    return;
+  }
   const position = reportPoint(report);
   if (!position) {
     elements.status.textContent = "This report does not have a valid location.";
     return;
   }
 
+  state.creationMode = null;
+  state.pendingReportType = null;
   state.editingReportId = report.id;
   state.locationEditMode = true;
   elements.editToolbar.hidden = false;
@@ -830,20 +929,11 @@ function startReportPlacement(report) {
   elements.editModeLabel.textContent = "Location";
   elements.editInstructions.textContent = "Drag the marker to the report location, then save.";
   setLocationEditButton(true);
-  elements.roadEditor.hidden = !isMissingRoadReport(report);
-  state.draftNodes = report.editorDraft?.nodes?.filter(isLngLat) || [];
-  setDrawMode(report.editorDraft?.mode || "node");
+  elements.roadEditor.hidden = true;
+  elements.saveLocation.hidden = false;
+  state.draftNodes = [];
 
-  if (!state.reportPlacementMarker) {
-    state.reportPlacementMarker = new maplibregl.Marker({
-      draggable: true,
-      element: makeReportPlacementMarker()
-    });
-    state.reportPlacementMarker.on("dragend", () => {
-      const point = state.reportPlacementMarker.getLngLat();
-      elements.status.textContent = `Report marker moved to ${point.lat.toFixed(5)}, ${point.lng.toFixed(5)}.`;
-    });
-  }
+  ensureReportPlacementMarker();
   state.reportPlacementMarker.setLngLat(position).addTo(state.map);
   state.reportPlacementMarker.getElement().hidden = false;
   renderEditorDraft(report);
@@ -851,11 +941,26 @@ function startReportPlacement(report) {
 
 function stopReportEditing() {
   state.editingReportId = null;
+  state.creationMode = null;
+  state.pendingReportType = null;
   state.locationEditMode = false;
   state.draftNodes = [];
   elements.editToolbar.hidden = true;
+  elements.saveLocation.hidden = false;
   if (state.reportPlacementMarker) state.reportPlacementMarker.getElement().hidden = true;
+  clearDraftNodeMarkers();
   renderEditorDraft();
+}
+
+async function saveNewPlacedReport() {
+  if (!state.pendingReportType || !state.reportPlacementMarker) return;
+  const point = state.reportPlacementMarker.getLngLat();
+  const report = await addReport(state.pendingReportType, point);
+  if (report) {
+    stopReportEditing();
+    const synced = state.reports.find((item) => item.id === report.id) || report;
+    focusReport(synced);
+  }
 }
 
 async function saveReportLocation() {
@@ -870,8 +975,12 @@ async function saveReportLocation() {
 }
 
 function setLocationEditButton(editing) {
-  elements.saveLocation.querySelector(".material-symbols-rounded").textContent = editing ? "location_on" : "edit_location_alt";
-  elements.saveLocation.querySelector("span:last-child").textContent = editing ? "Save location" : "Edit report location";
+  setSaveLocationButton(editing ? "location_on" : "edit_location_alt", editing ? "Save location" : "Edit report location");
+}
+
+function setSaveLocationButton(icon, label) {
+  elements.saveLocation.querySelector(".material-symbols-rounded").textContent = icon;
+  elements.saveLocation.querySelector("span:last-child").textContent = label;
 }
 
 function handleStudioMapClick(event) {
@@ -879,31 +988,27 @@ function handleStudioMapClick(event) {
     state.ignoreNextMapClick = false;
     return;
   }
-  if (!state.editingReportId || elements.roadEditor.hidden) return;
-  if (!["node", "road", "area"].includes(state.drawMode)) return;
+  const roadEditorActive = !elements.roadEditor.hidden && (state.creationMode === "missing-road" || state.editingReportId);
+  if (!roadEditorActive) return;
+  if (state.drawMode !== "road") return;
   state.draftNodes.push([event.lngLat.lng, event.lngLat.lat]);
   renderEditorDraft();
 }
 
 function setDrawMode(mode) {
-  state.drawMode = ["node", "road", "area"].includes(mode) ? mode : "node";
+  state.drawMode = mode === "road" ? "road" : "road";
   elements.drawModeButtons.forEach((button) => {
     button.classList.toggle("active", button.dataset.drawMode === state.drawMode);
   });
-  elements.editModeLabel.textContent = state.drawMode === "area" ? "Area" : state.drawMode === "road" ? "Road" : "Node";
+  elements.editModeLabel.textContent = "Road";
   if (!elements.roadEditor.hidden) {
-    elements.editInstructions.textContent = state.drawMode === "area"
-      ? "Click to add area vertices. Use Save draft when the polygon is ready."
-      : state.drawMode === "road"
-        ? "Click along the missing road to create connected nodes."
-        : "Click to add standalone map nodes.";
+    elements.editInstructions.textContent = "Click the map to add road nodes. Drag nodes to adjust, or click a node to delete it.";
   }
   renderEditorDraft();
 }
 
 async function saveEditorDraft() {
   const report = selectedReport();
-  if (!report) return;
   if (!state.draftNodes.length) {
     elements.status.textContent = "Add at least one node before saving the draft.";
     return;
@@ -912,13 +1017,24 @@ async function saveEditorDraft() {
     elements.status.textContent = "A missing road needs at least two nodes.";
     return;
   }
-  if (state.drawMode === "area" && state.draftNodes.length < 3) {
-    elements.status.textContent = "An area needs at least three vertices.";
+  const editorDraft = {
+    mode: "road",
+    nodes: state.draftNodes
+  };
+  if (state.creationMode === "missing-road") {
+    const firstNode = state.draftNodes[0];
+    const created = await addReport("Missing road", { lng: firstNode[0], lat: firstNode[1] }, { editorDraft });
+    if (created) {
+      stopReportEditing();
+      const synced = state.reports.find((item) => item.id === created.id) || created;
+      focusReport(synced);
+    }
     return;
   }
+  if (!report) return;
   await updateSelectedReport({
     editorDraft: {
-      mode: state.drawMode,
+      mode: "road",
       nodes: state.draftNodes
     }
   }, "Missing road draft saved.");
@@ -957,16 +1073,20 @@ function clearSelectedReportLayers() {
   state.map.getSource("studio-report-actual")?.setData(emptyFeatureCollection());
   state.map.getSource("studio-report-focus")?.setData(emptyFeatureCollection());
   state.map.getSource("studio-editor-draft")?.setData(emptyFeatureCollection());
+  clearDraftNodeMarkers();
 }
 
 function renderEditorDraft(report = selectedReport()) {
   if (!state.map?.isStyleLoaded() || !state.map.getSource("studio-editor-draft")) return;
-  const nodes = state.editingReportId
+  const editingDraft = state.editingReportId || state.creationMode === "missing-road";
+  const nodes = editingDraft
     ? state.draftNodes
     : (report?.editorDraft?.nodes || []);
-  const mode = state.editingReportId ? state.drawMode : report?.editorDraft?.mode;
+  const mode = editingDraft ? state.drawMode : report?.editorDraft?.mode;
   state.map.getSource("studio-editor-draft").setData(editorDraftFeatureCollection(nodes, mode));
   elements.draftCount.textContent = `${nodes.length} node${nodes.length === 1 ? "" : "s"}`;
+  if (editingDraft && !elements.roadEditor.hidden) renderDraftNodeMarkers(nodes);
+  else clearDraftNodeMarkers();
 }
 
 function makeReportPlacementMarker() {
@@ -976,25 +1096,73 @@ function makeReportPlacementMarker() {
   return marker;
 }
 
+function ensureReportPlacementMarker() {
+  if (state.reportPlacementMarker) return;
+  state.reportPlacementMarker = new maplibregl.Marker({
+    draggable: true,
+    element: makeReportPlacementMarker()
+  });
+  state.reportPlacementMarker.on("dragend", () => {
+    const point = state.reportPlacementMarker.getLngLat();
+    elements.status.textContent = `Marker moved to ${point.lat.toFixed(5)}, ${point.lng.toFixed(5)}.`;
+  });
+}
+
+function renderDraftNodeMarkers(nodes = state.draftNodes) {
+  clearDraftNodeMarkers();
+  nodes.filter(isLngLat).forEach((point, index) => {
+    let lastDraggedAt = 0;
+    const marker = new maplibregl.Marker({
+      draggable: true,
+      element: makeDraftNodeMarker(index)
+    })
+      .setLngLat(point)
+      .addTo(state.map);
+
+    marker.on("dragstart", () => {
+      lastDraggedAt = Date.now();
+    });
+    marker.on("dragend", () => {
+      lastDraggedAt = Date.now();
+      const moved = marker.getLngLat();
+      state.draftNodes[index] = [moved.lng, moved.lat];
+      renderEditorDraft();
+    });
+
+    marker.getElement().addEventListener("click", (event) => {
+      event.stopPropagation();
+      if (Date.now() - lastDraggedAt < 350) return;
+      state.draftNodes.splice(index, 1);
+      renderEditorDraft();
+    });
+
+    state.draftNodeMarkers.push(marker);
+  });
+}
+
+function clearDraftNodeMarkers() {
+  state.draftNodeMarkers.forEach((marker) => marker.remove());
+  state.draftNodeMarkers = [];
+}
+
+function makeDraftNodeMarker(index) {
+  const marker = document.createElement("button");
+  marker.className = "studio-draft-node-marker";
+  marker.type = "button";
+  marker.title = "Drag to adjust, click to delete";
+  marker.setAttribute("aria-label", `Road node ${index + 1}`);
+  marker.textContent = String(index + 1);
+  return marker;
+}
+
 function editorDraftFeatureCollection(nodes = [], mode = "node") {
   const validNodes = nodes.filter(isLngLat);
-  const features = validNodes.map((point, index) => ({
-    type: "Feature",
-    properties: { index },
-    geometry: { type: "Point", coordinates: point }
-  }));
+  const features = [];
   if (mode === "road" && validNodes.length >= 2) {
     features.unshift({
       type: "Feature",
       properties: {},
       geometry: { type: "LineString", coordinates: validNodes }
-    });
-  }
-  if (mode === "area" && validNodes.length >= 3) {
-    features.unshift({
-      type: "Feature",
-      properties: {},
-      geometry: { type: "Polygon", coordinates: [[...validNodes, validNodes[0]]] }
     });
   }
   return {

@@ -203,11 +203,6 @@
             <h1>Road editor</h1>
             <span id="studio-draft-count">0 nodes</span>
           </div>
-          <div class="studio-tool-grid" role="toolbar" aria-label="Missing road drawing tools">
-            <button class="studio-tool-button active" data-draw-mode="node" type="button"><span class="material-symbols-rounded" aria-hidden="true">add_location_alt</span><span>Node</span></button>
-            <button class="studio-tool-button" data-draw-mode="road" type="button"><span class="material-symbols-rounded" aria-hidden="true">timeline</span><span>Road</span></button>
-            <button class="studio-tool-button" data-draw-mode="area" type="button"><span class="material-symbols-rounded" aria-hidden="true">pentagon</span><span>Area</span></button>
-          </div>
           <div class="studio-edit-actions">
             <button class="quiet-button" id="studio-undo-node" type="button">
               <span class="material-symbols-rounded" aria-hidden="true">undo</span>
@@ -219,28 +214,28 @@
             </button>
             <button class="start-route-button" id="studio-save-draft" type="button">
               <span class="material-symbols-rounded" aria-hidden="true">save</span>
-              <span>Save draft</span>
+              <span>Save road</span>
             </button>
           </div>
         </section>
       </section>
 
       <aside class="studio-panel">
-        <p class="status-line" id="studio-status">Choose an action. New items are placed at the map center.</p>
+        <p class="status-line" id="studio-status">Choose an action. New reports can be positioned before publishing.</p>
         <p class="status-line studio-login-status" id="osm-login-status">Login with Street Smart Studio before submitting map edits.</p>
 
-        <details class="studio-section studio-accordion" open>
+        <details class="studio-section studio-accordion">
           <summary>
             <span>Edit the map</span>
             <span class="material-symbols-rounded" aria-hidden="true">expand_more</span>
           </summary>
           <div class="studio-report-actions">
-            <button class="report-button" data-signal="Missing road" type="button"><span class="material-symbols-rounded" aria-hidden="true">add_road</span>Add a missing road</button>
-            <button class="report-button" data-signal="Update place details" type="button"><span class="material-symbols-rounded" aria-hidden="true">edit_location_alt</span>Update place details</button>
+            <button class="report-button" data-map-edit="missing-road" type="button"><span class="material-symbols-rounded" aria-hidden="true">add_road</span>Add a missing road</button>
+            <button class="report-button" data-map-edit="missing-place" type="button"><span class="material-symbols-rounded" aria-hidden="true">add_location_alt</span>Add a missing place</button>
           </div>
         </details>
 
-        <details class="studio-section studio-accordion" open>
+        <details class="studio-section studio-accordion">
           <summary>
             <span>Add a report</span>
             <span id="studio-report-count">0 open</span>
@@ -270,6 +265,6 @@
     </main>
 
     <script src="https://unpkg.com/maplibre-gl@5.0.0/dist/maplibre-gl.js"></script>
-    <script type="module" src="/src/Studio.js?v=20260424-1815"></script>
+    <script type="module" src="/src/Studio.js?v=20260424-1900"></script>
   </body>
 </html>

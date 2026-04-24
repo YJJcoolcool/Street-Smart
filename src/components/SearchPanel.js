@@ -502,7 +502,7 @@ export class SearchPanel {
     if (!this.selectedMarker) {
       const element = document.createElement("div");
       element.className = "place-marker selected-place-marker";
-      element.innerHTML = `<span class="material-symbols-rounded" aria-hidden="true">location_on</span>`;
+      element.innerHTML = `<span aria-hidden="true"></span>`;
       this.selectedMarker = new maplibregl.Marker({
         element,
         anchor: "bottom"

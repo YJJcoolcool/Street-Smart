@@ -356,6 +356,25 @@ button {
   transform: rotate(45deg);
 }
 
+.studio-draft-node-marker {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  color: #fff;
+  background: var(--accent);
+  border: 3px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 6px 16px rgba(27, 45, 39, 0.28);
+  cursor: grab;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.studio-draft-node-marker:active {
+  cursor: grabbing;
+}
+
 .studio-admin-list {
   display: grid;
   gap: 7px;
@@ -427,6 +446,11 @@ button {
   list-style: none;
   font-size: 18px;
   font-weight: 900;
+}
+
+.studio-accordion > summary::marker {
+  content: "";
+  display: none;
 }
 
 .studio-accordion > summary::-webkit-details-marker {
@@ -1961,10 +1985,8 @@ kbd {
 }
 
 .selected-place-marker {
-  align-items: start;
-  padding-top: 0;
-  width: 38px;
-  height: 48px;
+  width: 42px;
+  height: 52px;
   color: #fff;
   background: transparent;
   border: 0;
@@ -1974,8 +1996,8 @@ kbd {
 
 .selected-place-marker::before {
   position: absolute;
-  top: 0;
-  left: 0;
+  top: 1px;
+  left: 2px;
   width: 38px;
   height: 38px;
   background: var(--accent);
@@ -1989,9 +2011,9 @@ kbd {
 .selected-place-marker::after {
   position: absolute;
   left: 50%;
-  bottom: 2px;
-  width: 14px;
-  height: 14px;
+  bottom: 7px;
+  width: 16px;
+  height: 16px;
   background: var(--accent);
   border-right: 3px solid #fff;
   border-bottom: 3px solid #fff;
@@ -1999,11 +2021,16 @@ kbd {
   transform: translateX(-50%) rotate(45deg);
 }
 
-.selected-place-marker .material-symbols-rounded {
-  position: relative;
+.selected-place-marker > span {
+  position: absolute;
+  top: 14px;
+  left: 50%;
   z-index: 1;
-  margin-top: 7px;
-  font-size: 24px;
+  width: 8px;
+  height: 8px;
+  background: #fff;
+  border-radius: 50%;
+  transform: translateX(-50%);
 }
 
 .anchor-marker {

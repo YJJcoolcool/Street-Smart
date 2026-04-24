@@ -1,9 +1,6 @@
 import { labelForMode } from "../lib/format.js";
 import { fetchStudioReports, publishReport } from "../lib/api.js";
 
-const REPORT_CLUSTER_RADIUS = 30;
-const REPORT_CLUSTER_MAX_ZOOM = 12;
-
 export class ReportPanel {
   constructor({ state, elements, sheet }) {
     this.state = state;
@@ -25,13 +22,7 @@ export class ReportPanel {
       this.render();
     });
 
-    this.state.map.on("load", () => {
-      this.installLayers();
-      this.renderMapReports();
-    });
-    ["moveend", "zoomend"].forEach((eventName) => {
-      this.state.map.on(eventName, () => this.renderMapReports());
-    });
+    this.state.map.on("load", () => this.renderMapReports());
   }
 
   open() {
@@ -119,113 +110,8 @@ export class ReportPanel {
     this.renderMapReports();
   }
 
-  installLayers() {
-    const map = this.state.map;
-    if (!map.getSource("user-reports")) {
-      map.addSource("user-reports", {
-        type: "geojson",
-        data: reportFeatureCollection([]),
-        cluster: true,
-        clusterRadius: REPORT_CLUSTER_RADIUS,
-        clusterMaxZoom: REPORT_CLUSTER_MAX_ZOOM
-      });
-    }
-
-    if (!map.getLayer("user-report-clusters")) {
-      map.addLayer({
-        id: "user-report-clusters",
-        type: "circle",
-        source: "user-reports",
-        filter: ["has", "point_count"],
-        paint: {
-          "circle-color": "#c26a28",
-          "circle-radius": ["step", ["get", "point_count"], 18, 10, 24, 30, 32],
-          "circle-opacity": 0.92,
-          "circle-stroke-color": "#ffffff",
-          "circle-stroke-width": 3
-        }
-      });
-    }
-
-    if (!map.getLayer("user-report-cluster-count")) {
-      map.addLayer({
-        id: "user-report-cluster-count",
-        type: "symbol",
-        source: "user-reports",
-        filter: ["has", "point_count"],
-        layout: {
-          "text-field": ["get", "point_count_abbreviated"],
-          "text-size": 12
-        },
-        paint: {
-          "text-color": "#ffffff"
-        }
-      });
-    }
-
-    if (!map.getLayer("user-report-point")) {
-      map.addLayer({
-        id: "user-report-point",
-        type: "circle",
-        source: "user-reports",
-        filter: ["!", ["has", "point_count"]],
-        paint: {
-          "circle-color": "#c26a28",
-          "circle-radius": 8,
-          "circle-stroke-color": "#ffffff",
-          "circle-stroke-width": 3
-        }
-      });
-    }
-
-    if (!this.layersInstalled) {
-      map.on("click", "user-report-clusters", (event) => this.openReportCluster(event));
-      map.on("click", "user-report-point", (event) => this.focusReportPoint(event));
-    }
-    this.layersInstalled = true;
-  }
-
   renderMapReports() {
-    if (!this.state.map?.isStyleLoaded()) return;
-    this.installLayers();
-    this.state.map.getSource("user-reports")?.setData(reportFeatureCollection(this.reportsInView()));
-  }
-
-  reportsInView() {
-    const bounds = this.state.map.getBounds();
-    return this.state.reports.filter((report) => {
-      const point = reportPoint(report);
-      return point && bounds.contains(point);
-    });
-  }
-
-  async openReportCluster(event) {
-    const feature = event.features?.[0];
-    const source = this.state.map.getSource("user-reports");
-    if (!feature || !source) return;
-
-    try {
-      const zoom = await getClusterExpansionZoom(source, feature.properties.cluster_id);
-      this.state.map.easeTo({
-        center: feature.geometry.coordinates,
-        zoom: Math.min(Math.max(this.state.map.getZoom() + 1, zoom + 0.5), 17.5),
-        duration: 550
-      });
-    } catch (error) {
-      console.warn("Could not expand report cluster.", error);
-    }
-  }
-
-  focusReportPoint(event) {
-    const id = event.features?.[0]?.properties?.id;
-    const report = this.state.reports.find((candidate) => candidate.id === id);
-    if (!report) return;
-    this.state.map.easeTo({
-      center: [report.lng, report.lat],
-      zoom: Math.max(this.state.map.getZoom(), 16),
-      duration: 500
-    });
-    this.elements.status.textContent = `${report.type}: ${report.context || formatReportLocation(report)}`;
+    this.state.map?.getSource("user-reports")?.setData(reportFeatureCollection([]));
   }
 }
 
@@ -277,14 +163,4 @@ function isLngLat(point) {
     && point.length >= 2
     && Number.isFinite(Number(point[0]))
     && Number.isFinite(Number(point[1]));
-}
-
-function getClusterExpansionZoom(source, clusterId) {
-  return new Promise((resolve, reject) => {
-    const result = source.getClusterExpansionZoom(clusterId, (error, zoom) => {
-      if (error) reject(error);
-      else resolve(zoom);
-    });
-    if (result?.then) result.then(resolve).catch(reject);
-  });
 }
