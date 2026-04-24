@@ -19,6 +19,7 @@ export class RoutePanel {
     this.lastDeviationReroute = -Infinity;
     this.deviationRerouteInFlight = false;
     this.rerouteInstructionLoading = false;
+    this.rerouteInstructionLoadingStartedAt = 0;
     this.routeEditMode = null;
     this.deviationMap = null;
   }
@@ -333,6 +334,7 @@ export class RoutePanel {
       deviations: this.state.navigation.deviations || []
     };
     this.rerouteInstructionLoading = false;
+    this.rerouteInstructionLoadingStartedAt = 0;
     if (arrived && this.state.lastTripStats) {
       this.elements.routeDistance.textContent = formatDistance(this.state.lastTripStats.distance);
       this.elements.routeDuration.textContent = formatActualDuration(this.state.lastTripStats.duration);
@@ -387,6 +389,7 @@ export class RoutePanel {
     this.state.addingStop = false;
     this.routeEditMode = null;
     this.rerouteInstructionLoading = false;
+    this.rerouteInstructionLoadingStartedAt = 0;
     this.state.route = { routes: [], activeIndex: 0, loading: false, error: null };
     this.state.navigation = { active: false, simulating: false, paused: false, manualControl: false, progressIndex: 0, routeProgressMeters: 0, heading: null, trace: [], lastTracePoint: null, startedAt: null, endedAt: null, actualDistanceMeters: 0, deviations: [] };
     this.state.lastTripStats = null;
@@ -473,7 +476,9 @@ export class RoutePanel {
     const subtitle = activeRoute && this.state.startPlace && this.state.endPlace
       ? `${this.state.startPlace.name} to ${this.state.endPlace.name}`
       : "Start and end location";
-    this.sheet.update("Trip", subtitle);
+    if (!(this.rerouteInstructionLoading && this.state.navigation.active)) {
+      this.sheet.update("Trip", subtitle);
+    }
   }
 
   renderRouteLocations() {
@@ -1055,7 +1060,7 @@ export class RoutePanel {
     if (this.deviationRerouteInFlight || now - this.lastDeviationReroute < DEVIATION_REROUTE_INTERVAL_MS) return;
     this.deviationRerouteInFlight = true;
     this.lastDeviationReroute = now;
-    this.setRouteDetails("Rerouting");
+    this.setRouteDetails("Re-routing");
     this.setRerouteInstructionLoading(true);
     this.showRouteError("");
     let rerouteFailed = false;
@@ -1088,17 +1093,20 @@ export class RoutePanel {
     } catch (error) {
       console.error(error);
       rerouteFailed = true;
+      await this.waitForMinimumRerouteInstructionLoading();
+      if (!this.state.navigation.active) return;
       this.setRerouteInstructionError(error.message || "routing failed");
       this.showRouteError(error.message || "Could not revise route yet.");
       this.setStatus(`Could not revise route yet: ${error.message || "routing failed"}`);
     } finally {
       this.deviationRerouteInFlight = false;
-      if (!rerouteFailed) this.setRerouteInstructionLoading(false);
+      if (!rerouteFailed) await this.clearRerouteInstructionLoading();
     }
   }
 
   setRerouteInstructionLoading(loading) {
     this.rerouteInstructionLoading = Boolean(loading);
+    this.rerouteInstructionLoadingStartedAt = loading ? performance.now() : 0;
     const nextStep = this.elements.nextStepPrimary.closest(".next-step");
     nextStep?.classList.toggle("is-loading", loading);
     this.elements.sheetHandle?.classList.toggle("is-loading", loading);
@@ -1110,17 +1118,33 @@ export class RoutePanel {
     }
 
     this.elements.nextStepIcon.textContent = "progress_activity";
-    this.elements.nextStepPrimary.textContent = "Reloading";
+    this.elements.nextStepPrimary.textContent = "Re-routing";
     this.elements.nextStepSecondary.textContent = "Finding a revised route...";
     if (this.state.navigation.active) {
-      this.sheet.update("Reloading", "Finding a revised route...", {
+      this.sheet.update("Re-routing", "Finding a revised route...", {
         icon: "progress_activity"
       });
     }
   }
 
+  async clearRerouteInstructionLoading() {
+    const startedAt = this.rerouteInstructionLoadingStartedAt;
+    if (!startedAt) return;
+    await this.waitForMinimumRerouteInstructionLoading(startedAt);
+    if (this.rerouteInstructionLoadingStartedAt !== startedAt) return;
+    this.setRerouteInstructionLoading(false);
+  }
+
+  waitForMinimumRerouteInstructionLoading(startedAt = this.rerouteInstructionLoadingStartedAt) {
+    if (!startedAt) return Promise.resolve();
+    const remaining = MIN_REROUTE_INSTRUCTION_MS - (performance.now() - startedAt);
+    if (remaining <= 0) return Promise.resolve();
+    return new Promise((resolve) => window.setTimeout(resolve, remaining));
+  }
+
   setRerouteInstructionError(message) {
     this.rerouteInstructionLoading = false;
+    this.rerouteInstructionLoadingStartedAt = 0;
     const nextStep = this.elements.nextStepPrimary.closest(".next-step");
     nextStep?.classList.remove("is-loading");
     nextStep?.classList.add("is-error");
@@ -1755,6 +1779,7 @@ function appendDeviationPoint(line = [], point) {
 const DEVIATION_CHECK_INTERVAL_MS = 2500;
 const DEVIATION_MONITOR_INTERVAL_MS = 1000;
 const DEVIATION_REROUTE_INTERVAL_MS = 5000;
+const MIN_REROUTE_INSTRUCTION_MS = 1000;
 const OFF_ROUTE_DISTANCE_METERS = 70;
 const ON_ROUTE_DISTANCE_METERS = 45;
 const REJOIN_DISTANCE_METERS = 35;

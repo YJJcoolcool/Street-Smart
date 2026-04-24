@@ -71,7 +71,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (requestUrl.pathname === "/api/osm-style") {
-      return sendJson(res, osmRasterStyle());
+      return sendJson(res, osmRasterStyle(requestUrl));
     }
 
     if (requestUrl.pathname === "/api/grab-resource" || requestUrl.pathname === "/api/grab-resource.json" || requestUrl.pathname === "/api/grab-resource.png") {
@@ -1240,11 +1240,11 @@ function blankMapStyle(reason) {
   };
 }
 
-function osmRasterStyle() {
+function osmRasterStyle(requestUrl = null) {
   return {
     version: 8,
     name: "OpenStreetMap fallback",
-    glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+    glyphs: glyphsUrl(requestUrl),
     sources: {
       "osm-raster": {
         type: "raster",
@@ -1266,6 +1266,18 @@ function osmRasterStyle() {
       }
     ]
   };
+}
+
+function glyphsUrl(requestUrl) {
+  if (hasDisplayGrabKey && requestUrl) {
+    const localBase = `${requestUrl.protocol}//${requestUrl.host}`;
+    const upstreamUrl = new URL("/api/maps/tiles/v2/fonts/{fontstack}/{range}.pbf", GRAB_BASE_URL);
+    const encoded = encodeURIComponent(decodeURI(upstreamUrl.href))
+      .replace(/%7B/g, "{")
+      .replace(/%7D/g, "}");
+    return `${localBase}/api/grab-resource?url=${encoded}`;
+  }
+  return "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf";
 }
 
 async function callMcpTool(name, args) {

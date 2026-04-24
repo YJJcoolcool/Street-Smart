@@ -1677,14 +1677,16 @@ kbd {
 
 .deviation-map-legend {
   position: absolute;
-  right: 8px;
-  bottom: 8px;
-  left: 8px;
+  top: 8px;
+  left: 50%;
   z-index: 1;
   display: flex;
   flex-wrap: wrap;
   gap: 8px 14px;
   align-items: center;
+  justify-content: center;
+  width: max-content;
+  max-width: calc(100% - 16px);
   padding: 7px 9px;
   background: rgba(255, 255, 255, 0.92);
   border: 1px solid rgba(22, 32, 29, 0.08);
@@ -1692,6 +1694,7 @@ kbd {
   box-shadow: var(--shadow-sm);
   font-size: 11px;
   font-weight: 900;
+  transform: translateX(-50%);
 }
 
 .deviation-map-legend span {
@@ -1769,10 +1772,10 @@ kbd {
 }
 
 .report-category strong {
-  display: inline-grid;
-  grid-auto-flow: column;
+  display: inline-flex;
   gap: 6px;
   align-items: center;
+  justify-self: start;
   grid-column: 1 / -1;
   font-size: 12px;
   line-height: 1.2;

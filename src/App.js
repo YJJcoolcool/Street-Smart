@@ -2,8 +2,8 @@ import { fetchConfig } from "./lib/api.js";
 import { makeCurrentPlace, createState } from "./state/createState.js";
 import { BottomSheet } from "./components/BottomSheet.js";
 import { SearchPanel } from "./components/SearchPanel.js";
-import { RoutePanel } from "./components/RoutePanel.js";
-import { ReportPanel } from "./components/ReportPanel.js";
+import { RoutePanel } from "./components/RoutePanel.js?v=20260424-1915";
+import { ReportPanel } from "./components/ReportPanel.js?v=20260424-1905";
 import { LocationLayer } from "./components/LocationLayer.js";
 
 export async function createStreetSmartApp() {

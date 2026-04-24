@@ -1077,16 +1077,39 @@ function clearSelectedReportLayers() {
 }
 
 function renderEditorDraft(report = selectedReport()) {
-  if (!state.map?.isStyleLoaded() || !state.map.getSource("studio-editor-draft")) return;
   const editingDraft = state.editingReportId || state.creationMode === "missing-road";
   const nodes = editingDraft
     ? state.draftNodes
     : (report?.editorDraft?.nodes || []);
   const mode = editingDraft ? state.drawMode : report?.editorDraft?.mode;
-  state.map.getSource("studio-editor-draft").setData(editorDraftFeatureCollection(nodes, mode));
   elements.draftCount.textContent = `${nodes.length} node${nodes.length === 1 ? "" : "s"}`;
+
+  if (!state.map?.isStyleLoaded()) {
+    queueEditorDraftRender();
+    if (editingDraft && !elements.roadEditor.hidden) renderDraftNodeMarkers(nodes);
+    else clearDraftNodeMarkers();
+    return;
+  }
+
+  installReportLayers();
+  const source = state.map.getSource("studio-editor-draft");
+  if (!source) {
+    queueEditorDraftRender();
+    return;
+  }
+
+  source.setData(editorDraftFeatureCollection(nodes, mode));
   if (editingDraft && !elements.roadEditor.hidden) renderDraftNodeMarkers(nodes);
   else clearDraftNodeMarkers();
+}
+
+function queueEditorDraftRender() {
+  if (!state.map || state.pendingEditorDraftRender) return;
+  state.pendingEditorDraftRender = true;
+  state.map.once("idle", () => {
+    state.pendingEditorDraftRender = false;
+    renderEditorDraft();
+  });
 }
 
 function makeReportPlacementMarker() {
