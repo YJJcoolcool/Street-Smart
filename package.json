@@ -1,0 +1,11 @@
+{
+  "name": "street-smart",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "ngrok": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./Start-Ngrok.ps1 -NoPause",
+    "ngrok:stop": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./Stop-Ngrok.ps1 -NoPause"
+  }
+}

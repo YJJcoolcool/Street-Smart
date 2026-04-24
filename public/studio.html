@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Street Smart Studio</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,500,1,0" />
+    <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.0.0/dist/maplibre-gl.css" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="studio-app">
+      <div id="studio-map"></div>
+
+      <header class="studio-header">
+        <div>
+          <h1>Street Smart Studio</h1>
+        </div>
+        <div class="studio-actions">
+          <a class="studio-back-button" href="/" aria-label="Back to Street Smart" title="Back to Street Smart">
+            <span class="material-symbols-rounded" aria-hidden="true">arrow_back</span>
+            <span>Street Smart</span>
+          </a>
+          <button class="studio-login-button" id="osm-login-button" type="button">
+            <span class="material-symbols-rounded" aria-hidden="true">account_circle</span>
+            <span id="osm-login-label">Login</span>
+          </button>
+          <button class="settings-button" id="settings-button" type="button" aria-label="Settings" title="Settings">
+            <span class="material-symbols-rounded" aria-hidden="true">settings</span>
+          </button>
+        </div>
+      </header>
+
+      <section class="settings-panel" id="settings-panel" aria-label="Settings" hidden>
+        <div class="section-heading">
+          <h1>Settings</h1>
+          <button class="settings-close" id="settings-close" type="button" aria-label="Close settings">
+            <span class="material-symbols-rounded" aria-hidden="true">close</span>
+          </button>
+        </div>
+        <div class="settings-category-list" id="settings-category-list">
+          <button class="settings-category-button" data-settings-category="display" type="button">
+            <span class="material-symbols-rounded" aria-hidden="true">map</span>
+            <span><strong>Display</strong><small>Map provider</small></span>
+            <span class="material-symbols-rounded settings-chevron" aria-hidden="true">chevron_right</span>
+          </button>
+          <button class="settings-category-button" data-settings-category="routing" type="button">
+            <span class="material-symbols-rounded" aria-hidden="true">alt_route</span>
+            <span><strong>Routing</strong><small>Routing provider</small></span>
+            <span class="material-symbols-rounded settings-chevron" aria-hidden="true">chevron_right</span>
+          </button>
+        </div>
+        <div class="settings-detail" id="settings-detail" hidden>
+          <button class="settings-back" id="settings-back" type="button">
+            <span class="material-symbols-rounded" aria-hidden="true">arrow_back</span>
+            <span>Back to settings</span>
+          </button>
+          <section class="settings-group" data-settings-panel="display" hidden>
+            <h2>Display</h2>
+            <label>
+              <span>Preferred map provider</span>
+              <select id="map-provider-select">
+                <option value="grab">Grab Maps</option>
+                <option value="grab-dark">Grab Maps Dark Mode</option>
+                <option value="grab-satellite">Grab Maps Satellite</option>
+                <option value="osm">OpenStreetMap</option>
+              </select>
+            </label>
+          </section>
+          <section class="settings-group" data-settings-panel="routing" hidden>
+            <h2>Routing</h2>
+            <label>
+              <span>Preferred routing provider</span>
+              <select id="routing-provider-select">
+                <option value="grab">Grab Maps</option>
+                <option value="osrm">OSRM</option>
+              </select>
+            </label>
+          </section>
+        </div>
+      </section>
+
+      <section class="studio-auth-panel" id="studio-auth-panel" aria-label="Studio login" hidden>
+        <div class="section-heading">
+          <h1>Studio login</h1>
+          <button class="settings-close" id="studio-auth-close" type="button" aria-label="Close login">
+            <span class="material-symbols-rounded" aria-hidden="true">close</span>
+          </button>
+        </div>
+        <p class="status-line" id="studio-auth-message">Login with a Street Smart account to publish map edits.</p>
+        <div class="studio-auth-session" id="studio-auth-session" hidden>
+          <span class="material-symbols-rounded" aria-hidden="true">verified_user</span>
+          <div>
+            <strong id="studio-auth-user">Not logged in</strong>
+            <span id="studio-auth-role">User</span>
+          </div>
+          <button class="quiet-button" id="studio-logout-button" type="button">Logout</button>
+        </div>
+        <form class="studio-auth-form" id="studio-login-form">
+          <strong>Login</strong>
+          <label>
+            <span>Username or email</span>
+            <input id="studio-login-identity" type="text" autocomplete="username" required />
+          </label>
+          <label>
+            <span>Password</span>
+            <input id="studio-login-password" type="password" autocomplete="current-password" required />
+          </label>
+          <button class="start-route-button" type="submit">
+            <span class="material-symbols-rounded" aria-hidden="true">login</span>
+            <span>Login</span>
+          </button>
+        </form>
+        <div class="studio-auth-switch" id="studio-login-switch">
+          <button type="button" data-auth-mode="create">Create account</button>
+          <button type="button" data-auth-mode="reset">Reset password</button>
+        </div>
+        <form class="studio-auth-form compact" id="studio-create-form" hidden>
+          <strong>Create account</strong>
+          <label>
+            <span>Username or email</span>
+            <input id="studio-create-identity" type="text" autocomplete="username" required />
+          </label>
+          <label>
+            <span>Password</span>
+            <input id="studio-create-password" type="password" autocomplete="new-password" minlength="8" required />
+          </label>
+          <button class="quiet-button" type="submit">
+            <span class="material-symbols-rounded" aria-hidden="true">person_add</span>
+            <span>Create account</span>
+          </button>
+        </form>
+        <div class="studio-auth-switch" id="studio-create-switch" hidden>
+          <button type="button" data-auth-mode="login">Back to login</button>
+          <button type="button" data-auth-mode="reset">Reset password</button>
+        </div>
+        <form class="studio-auth-form compact" id="studio-reset-form" hidden>
+          <strong>Reset password</strong>
+          <label>
+            <span>Username or email</span>
+            <input id="studio-reset-identity" type="text" autocomplete="username" required />
+          </label>
+          <label>
+            <span>Current password</span>
+            <input id="studio-reset-current-password" type="password" autocomplete="current-password" required />
+          </label>
+          <label>
+            <span>New password</span>
+            <input id="studio-reset-password" type="password" autocomplete="new-password" minlength="8" required />
+          </label>
+          <button class="quiet-button" type="submit">
+            <span class="material-symbols-rounded" aria-hidden="true">lock_reset</span>
+            <span>Reset password</span>
+          </button>
+        </form>
+        <div class="studio-auth-switch" id="studio-reset-switch" hidden>
+          <button type="button" data-auth-mode="login">Back to login</button>
+          <button type="button" data-auth-mode="create">Create account</button>
+        </div>
+        <section class="studio-admin-panel" id="studio-admin-panel" hidden>
+          <div class="section-heading">
+            <h1>Admins</h1>
+            <span id="studio-admin-count">0</span>
+          </div>
+          <ol class="studio-admin-list" id="studio-admin-list"></ol>
+          <form class="studio-auth-form compact" id="studio-admin-form">
+            <strong>Add admin</strong>
+            <label>
+              <span>Username or email</span>
+              <input id="studio-admin-identity" type="text" autocomplete="username" required />
+            </label>
+            <label>
+              <span>Initial password</span>
+              <input id="studio-admin-password" type="password" autocomplete="new-password" minlength="8" />
+            </label>
+            <button class="quiet-button" type="submit">
+              <span class="material-symbols-rounded" aria-hidden="true">admin_panel_settings</span>
+              <span>Add admin</span>
+            </button>
+          </form>
+        </section>
+      </section>
+
+      <section class="studio-edit-toolbar" id="studio-edit-toolbar" aria-label="Report editing tools" hidden>
+        <div class="section-heading">
+          <h1 id="studio-edit-title">Place report</h1>
+          <span id="studio-edit-mode-label">Location</span>
+        </div>
+        <p class="status-line" id="studio-edit-instructions">Drag the marker to the report location, then save.</p>
+        <div class="studio-edit-actions">
+          <button class="quiet-button" id="studio-save-location" type="button">
+            <span class="material-symbols-rounded" aria-hidden="true">location_on</span>
+            <span>Save location</span>
+          </button>
+          <button class="quiet-button" id="studio-cancel-edit" type="button">
+            <span class="material-symbols-rounded" aria-hidden="true">close</span>
+            <span>Cancel</span>
+          </button>
+        </div>
+        <section class="studio-road-editor" id="studio-road-editor" hidden>
+          <div class="section-heading">
+            <h1>Road editor</h1>
+            <span id="studio-draft-count">0 nodes</span>
+          </div>
+          <div class="studio-tool-grid" role="toolbar" aria-label="Missing road drawing tools">
+            <button class="studio-tool-button active" data-draw-mode="node" type="button"><span class="material-symbols-rounded" aria-hidden="true">add_location_alt</span><span>Node</span></button>
+            <button class="studio-tool-button" data-draw-mode="road" type="button"><span class="material-symbols-rounded" aria-hidden="true">timeline</span><span>Road</span></button>
+            <button class="studio-tool-button" data-draw-mode="area" type="button"><span class="material-symbols-rounded" aria-hidden="true">pentagon</span><span>Area</span></button>
+          </div>
+          <div class="studio-edit-actions">
+            <button class="quiet-button" id="studio-undo-node" type="button">
+              <span class="material-symbols-rounded" aria-hidden="true">undo</span>
+              <span>Undo</span>
+            </button>
+            <button class="quiet-button" id="studio-clear-draft" type="button">
+              <span class="material-symbols-rounded" aria-hidden="true">delete_sweep</span>
+              <span>Clear</span>
+            </button>
+            <button class="start-route-button" id="studio-save-draft" type="button">
+              <span class="material-symbols-rounded" aria-hidden="true">save</span>
+              <span>Save draft</span>
+            </button>
+          </div>
+        </section>
+      </section>
+
+      <aside class="studio-panel">
+        <p class="status-line" id="studio-status">Choose an action. New items are placed at the map center.</p>
+        <p class="status-line studio-login-status" id="osm-login-status">Login with Street Smart Studio before submitting map edits.</p>
+
+        <details class="studio-section studio-accordion" open>
+          <summary>
+            <span>Edit the map</span>
+            <span class="material-symbols-rounded" aria-hidden="true">expand_more</span>
+          </summary>
+          <div class="studio-report-actions">
+            <button class="report-button" data-signal="Missing road" type="button"><span class="material-symbols-rounded" aria-hidden="true">add_road</span>Add a missing road</button>
+            <button class="report-button" data-signal="Update place details" type="button"><span class="material-symbols-rounded" aria-hidden="true">edit_location_alt</span>Update place details</button>
+          </div>
+        </details>
+
+        <details class="studio-section studio-accordion" open>
+          <summary>
+            <span>Add a report</span>
+            <span id="studio-report-count">0 open</span>
+            <span class="material-symbols-rounded" aria-hidden="true">expand_more</span>
+          </summary>
+          <div class="studio-report-actions">
+            <button class="report-button" data-signal="Wrong access" type="button"><span class="material-symbols-rounded" aria-hidden="true">block</span>Wrong access</button>
+            <button class="report-button" data-signal="Unsafe crossing" type="button"><span class="material-symbols-rounded" aria-hidden="true">remove_road</span>Unsafe crossing</button>
+            <button class="report-button" data-signal="Road is flooded" type="button"><span class="material-symbols-rounded" aria-hidden="true">flood</span>Road is flooded</button>
+            <button class="report-button" data-signal="Construction works" type="button"><span class="material-symbols-rounded" aria-hidden="true">construction</span>Construction works</button>
+          </div>
+        </details>
+
+        <details class="studio-section studio-accordion" open>
+          <summary>
+            <span>User reports</span>
+            <span id="studio-visible-count">Clustered</span>
+            <span class="material-symbols-rounded" aria-hidden="true">expand_more</span>
+          </summary>
+          <ol class="signal-list" id="studio-report-list"></ol>
+          <div class="empty-signal" id="studio-empty">
+            <strong>No reports yet</strong>
+            <span>Published reports will appear here and cluster on the map.</span>
+          </div>
+        </details>
+      </aside>
+    </main>
+
+    <script src="https://unpkg.com/maplibre-gl@5.0.0/dist/maplibre-gl.js"></script>
+    <script type="module" src="/src/Studio.js?v=20260424-1815"></script>
+  </body>
+</html>

@@ -1,0 +1,8 @@
+.env
+.env.*
+!.env.example
+.mcp.local.json
+mcp.local.json
+*.log
+*.pid
+*.job
